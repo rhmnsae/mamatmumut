@@ -184,10 +184,12 @@
     z-index: 99;
     opacity: 0;
     transition: opacity var(--transition-normal);
+    pointer-events: none;
 }
 
 .sidebar-overlay.active {
     opacity: 1;
+    pointer-events: auto;
 }
 
 /* ===== Dashboard Specific ===== */
