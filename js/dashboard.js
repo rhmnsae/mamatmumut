@@ -100,6 +100,8 @@ const Dashboard = {
             this.charts.stock.destroy();
         }
 
+        const isMobile = window.innerWidth < 768;
+
         this.charts.stock = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -128,7 +130,8 @@ const Dashboard = {
                 },
                 plugins: {
                     legend: {
-                        position: 'right',
+                        position: isMobile ? 'bottom' : 'right',
+                        align: isMobile ? 'center' : 'center',
                         labels: {
                             color: '#94a3b8',
                             padding: 20,
@@ -153,6 +156,10 @@ const Dashboard = {
                 cutout: '75%',
                 layout: {
                     padding: 20
+                },
+                onResize: (chart, size) => {
+                    chart.options.plugins.legend.position = size.width < 768 ? 'bottom' : 'right';
+                    chart.update('none');
                 }
             }
         });

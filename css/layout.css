@@ -760,7 +760,7 @@
     /* Stats Grid Mobile */
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--space-sm);
+        gap: var(--space-md);
     }
 
     .stat-card {
@@ -790,12 +790,12 @@
 
     /* Charts Mobile */
     .chart-body {
-        height: 200px;
+        height: 320px;
         padding: var(--space-md);
     }
 
     .chart-header {
-        padding: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
     }
 
     .chart-header h3 {
