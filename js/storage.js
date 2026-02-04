@@ -358,24 +358,12 @@ const Storage = {
     );
   },
 
-  // ===== Image Upload =====
-
   /**
-   * Upload image
+   * Upload image - always use base64 for simplicity
+   * (Supabase Storage requires additional setup)
    */
   async uploadImage(file) {
-    // Offline mode - use base64
-    if (this._offlineMode) {
-      return this._imageToBase64(file);
-    }
-
-    try {
-      const result = await ApiClient.upload(file);
-      return result.url;
-    } catch (e) {
-      console.warn('Upload failed, using base64:', e);
-      return this._imageToBase64(file);
-    }
+    return this._imageToBase64(file);
   },
 
   /**
