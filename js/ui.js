@@ -391,6 +391,8 @@ const UI = {
                 break;
             case 'products':
                 this.elements.productsPage.classList.remove('hidden');
+                // Always render products when navigating to this page
+                Products.renderTable();
                 break;
             case 'outofstock':
                 if (this.elements.outofstockPage) {
