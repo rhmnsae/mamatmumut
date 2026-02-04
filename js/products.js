@@ -1,6 +1,7 @@
 /**
  * Products Module
  * Handles product CRUD operations and table rendering
+ * Updated for async API operations
  */
 
 const Products = {
@@ -39,114 +40,122 @@ const Products = {
 
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
+      // Debounced search
+      let searchTimeout;
       searchInput.addEventListener('input', (e) => {
-        this.renderTable(e.target.value);
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          this.renderTable(e.target.value);
+        }, 300);
       });
     }
   },
 
   /**
-   * Render products table
+   * Render products table (async)
    */
-  renderTable(searchQuery = '') {
-    const products = searchQuery
-      ? Storage.searchProducts(searchQuery)
-      : Storage.getProducts();
-
+  async renderTable(searchQuery = '') {
     const tbody = UI.elements.productsTableBody;
     const emptyState = document.getElementById('emptyState');
     const table = UI.elements.productsTable;
     const productsCard = document.getElementById('productsContentCard');
     const mobileCards = document.getElementById('mobileProductCards');
 
-    if (products.length === 0) {
-      tbody.innerHTML = '';
-      if (mobileCards) mobileCards.innerHTML = '';
-      if (productsCard) productsCard.classList.add('hidden');
-      emptyState.classList.remove('hidden');
-      return;
+    try {
+      // Fetch products from API
+      const products = searchQuery
+        ? await Storage.searchProducts(searchQuery)
+        : await Storage.getProducts();
+
+      if (products.length === 0) {
+        tbody.innerHTML = '';
+        if (mobileCards) mobileCards.innerHTML = '';
+        if (productsCard) productsCard.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      if (productsCard) productsCard.classList.remove('hidden');
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      // Render desktop table with clickable images
+      tbody.innerHTML = products.map((product, index) => `
+              <tr data-id="${product.id}">
+                  <td class="text-center text-muted text-sm">${index + 1}</td>
+                  <td class="table-img-cell">
+                      <img 
+                          class="table-img" 
+                          src="${product.image || this.getPlaceholderImage()}" 
+                          alt="${product.name}"
+                          onclick="UI.openImageModal('${product.image || ''}')"
+                      >
+                  </td>
+                  <td>
+                      <code class="mono text-xs text-muted">${product.sku || '-'}</code>
+                  </td>
+                  <td>
+                      <div class="product-name-link" onclick="Products.viewProduct('${product.id}')" style="cursor: pointer;">
+                          <div class="font-medium text-primary line-clamp-2">${product.name}</div>
+                      </div>
+                  </td>
+                  <td class="text-right">
+                      <span class="text-sm text-muted">${product.originalPrice ? UI.formatCurrency(product.originalPrice) : '-'}</span>
+                  </td>
+                  <td class="text-right">
+                      <span class="font-semibold text-success">${UI.formatCurrency(product.salePrice)}</span>
+                  </td>
+                  <td class="text-right">
+                      <span class="text-sm text-secondary">${product.weight ? `${product.weight}g` : '-'}</span>
+                  </td>
+                  <td>
+                      <span class="text-sm text-secondary text-xs">
+                          ${product.dimensions && (product.dimensions.l || product.dimensions.w || product.dimensions.h)
+          ? `${product.dimensions.l || 0}x${product.dimensions.w || 0}x${product.dimensions.h || 0}`
+          : '-'}
+                      </span>
+                  </td>
+                  <td class="text-center">
+                      <span 
+                          class="inline-edit" 
+                          data-id="${product.id}" 
+                          data-field="stock"
+                          title="Klik untuk edit"
+                      >
+                          <span class="${UI.getStockBadge(product.stock)}">${product.stock}</span>
+                      </span>
+                  </td>
+                  <td>
+                      <div class="table-actions">
+                          <button class="btn btn-ghost btn-icon" onclick="Products.editProduct('${product.id}')" title="Edit">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                          </button>
+                          <button class="btn btn-ghost btn-icon text-danger" onclick="Products.deleteProduct('${product.id}', '${product.name.replace(/'/g, "\\'")}')" title="Hapus">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                              </svg>
+                          </button>
+                      </div>
+                  </td>
+              </tr>
+          `).join('');
+
+      // Render mobile cards with clickable images
+      if (mobileCards) {
+        this.renderMobileCards(products, mobileCards);
+      }
+
+      // Setup inline edit
+      this.setupInlineEdit();
+
+    } catch (error) {
+      console.error('Error rendering products:', error);
+      UI.showToast('Gagal memuat produk', 'error');
     }
-
-    if (productsCard) productsCard.classList.remove('hidden');
-    table.classList.remove('hidden');
-    emptyState.classList.add('hidden');
-
-    // Render desktop table with clickable images
-    tbody.innerHTML = products.map((product, index) => `
-            <tr data-id="${product.id}">
-                <td class="text-center text-muted text-sm">${index + 1}</td>
-                <td class="table-img-cell">
-                    <img 
-                        class="table-img" 
-                        src="${product.image || this.getPlaceholderImage()}" 
-                        alt="${product.name}"
-                        onclick="UI.openImageModal('${product.image || ''}')"
-                    >
-                </td>
-                <td>
-                    <code class="mono text-xs text-muted">${product.sku || '-'}</code>
-                </td>
-                <td>
-                    <div class="product-name-link" onclick="Products.viewProduct('${product.id}')" style="cursor: pointer;">
-                        <div class="font-medium text-primary line-clamp-2">${product.name}</div>
-                    </div>
-                </td>
-                <td>
-                    <span class="text-sm text-secondary">${product.category || '-'}</span>
-                </td>
-                <td class="text-right">
-                    <span class="text-sm text-muted">${product.originalPrice ? UI.formatCurrency(product.originalPrice) : '-'}</span>
-                </td>
-                <td class="text-right">
-                    <span class="font-semibold text-success">${UI.formatCurrency(product.salePrice)}</span>
-                </td>
-                <td class="text-right">
-                    <span class="text-sm text-secondary">${product.weight ? `${product.weight}g` : '-'}</span>
-                </td>
-                <td>
-                    <span class="text-sm text-secondary text-xs">
-                        ${product.dimensions && (product.dimensions.l || product.dimensions.w || product.dimensions.h)
-        ? `${product.dimensions.l || 0}x${product.dimensions.w || 0}x${product.dimensions.h || 0}`
-        : '-'}
-                    </span>
-                </td>
-                <td class="text-center">
-                    <span 
-                        class="inline-edit" 
-                        data-id="${product.id}" 
-                        data-field="stock"
-                        title="Klik untuk edit"
-                    >
-                        <span class="${UI.getStockBadge(product.stock)}">${product.stock}</span>
-                    </span>
-                </td>
-                <td>
-
-                    <div class="table-actions">
-                        <button class="btn btn-ghost btn-icon" onclick="Products.editProduct('${product.id}')" title="Edit">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                        </button>
-                        <button class="btn btn-ghost btn-icon text-danger" onclick="Products.deleteProduct('${product.id}', '${product.name.replace(/'/g, "\\'")}')" title="Hapus">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
-
-    // Render mobile cards with clickable images
-    if (mobileCards) {
-      this.renderMobileCards(products, mobileCards);
-    }
-
-    // Setup inline edit
-    this.setupInlineEdit();
   },
 
   /**
@@ -166,6 +175,11 @@ const Products = {
       return '';
     };
 
+    const formatDimensions = (dimensions) => {
+      if (!dimensions || (!dimensions.l && !dimensions.w && !dimensions.h)) return '-';
+      return `${dimensions.l || 0}×${dimensions.w || 0}×${dimensions.h || 0} cm`;
+    };
+
     container.innerHTML = products.map(product => `
             <div class="mobile-product-card" data-id="${product.id}">
                 <div class="mobile-product-header">
@@ -178,17 +192,32 @@ const Products = {
                     <div class="mobile-product-info" onclick="Products.viewProduct('${product.id}')" style="cursor: pointer;">
                         <div class="mobile-product-name">${product.name}</div>
                         ${product.sku ? `<div class="mobile-product-sku">${product.sku}</div>` : ''}
-                        ${product.category ? `<span class="mobile-product-category">${product.category}</span>` : ''}
                     </div>
                 </div>
-                <div class="mobile-product-details">
-                    <div class="mobile-product-detail">
-                        <span class="mobile-product-label">Harga</span>
-                        <span class="mobile-product-value price">${UI.formatCurrency(product.salePrice)}</span>
+                <div class="mobile-product-details-grid">
+                    <div class="mobile-product-detail-row">
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">Harga Asli</span>
+                            <span class="mobile-product-value original-price">${product.originalPrice ? UI.formatCurrency(product.originalPrice) : '-'}</span>
+                        </div>
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">Harga Jual</span>
+                            <span class="mobile-product-value price">${UI.formatCurrency(product.salePrice)}</span>
+                        </div>
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">Stok</span>
+                            <span class="mobile-product-value ${getStockClass(product.stock)}">${product.stock}</span>
+                        </div>
                     </div>
-                    <div class="mobile-product-detail">
-                        <span class="mobile-product-label">Stok</span>
-                        <span class="mobile-product-value ${getStockClass(product.stock)}">${product.stock}</span>
+                    <div class="mobile-product-detail-row">
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">Berat</span>
+                            <span class="mobile-product-value">${product.weight ? `${product.weight}g` : '-'}</span>
+                        </div>
+                        <div class="mobile-product-detail full-width">
+                            <span class="mobile-product-label">Dimensi (P×L×T)</span>
+                            <span class="mobile-product-value">${formatDimensions(product.dimensions)}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="mobile-product-actions">
@@ -212,7 +241,7 @@ const Products = {
   },
 
   /**
-   * Setup inline stock edit
+   * Setup inline stock edit (async)
    */
   setupInlineEdit() {
     const editables = document.querySelectorAll('.inline-edit');
@@ -231,23 +260,29 @@ const Products = {
         input.focus();
         input.select();
 
-        const saveValue = () => {
+        const saveValue = async () => {
           const newValue = parseInt(input.value) || 0;
-          Storage.updateProduct(id, { stock: newValue });
-          this.renderTable(document.getElementById('searchInput')?.value || '');
-          UI.showToast('Stok berhasil diupdate');
 
-          // Refresh dashboard if exists
-          if (typeof Dashboard !== 'undefined') {
-            Dashboard.refresh();
+          try {
+            await Storage.updateProduct(id, { stock: newValue });
+            await this.renderTable(document.getElementById('searchInput')?.value || '');
+            UI.showToast('Stok berhasil diupdate');
+
+            // Refresh dashboard if exists
+            if (typeof Dashboard !== 'undefined') {
+              Dashboard.refresh();
+            }
+          } catch (error) {
+            console.error('Error updating stock:', error);
+            UI.showToast('Gagal update stok', 'error');
           }
         };
 
         input.addEventListener('blur', saveValue);
-        input.addEventListener('keydown', (e) => {
+        input.addEventListener('keydown', async (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            saveValue();
+            await saveValue();
           }
           if (e.key === 'Escape') {
             this.renderTable(document.getElementById('searchInput')?.value || '');
@@ -258,15 +293,21 @@ const Products = {
   },
 
   /**
-   * Save product (add or update)
+   * Save product (add or update) - async
    */
-  saveProduct() {
+  async saveProduct() {
     const id = document.getElementById('productId').value;
+    const saveBtn = document.getElementById('modalSave');
+
+    // Disable button during save
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Menyimpan...';
+    }
 
     const productData = {
       name: document.getElementById('productName').value.trim(),
       sku: document.getElementById('productSku').value.trim(),
-      category: document.getElementById('productCategory').value.trim(),
       originalPrice: parseFloat(document.getElementById('productOriginalPrice').value) || 0,
       salePrice: parseFloat(document.getElementById('productSalePrice').value),
       stock: parseInt(document.getElementById('productStock').value),
@@ -279,30 +320,45 @@ const Products = {
       image: UI.currentImage || null
     };
 
-    if (id) {
-      Storage.updateProduct(id, productData);
-      UI.showToast('Produk berhasil diupdate');
-    } else {
-      Storage.addProduct(productData);
-      UI.showToast('Produk berhasil ditambahkan');
-    }
+    try {
+      if (id) {
+        await Storage.updateProduct(id, productData);
+        UI.showToast('Produk berhasil diupdate');
+      } else {
+        await Storage.addProduct(productData);
+        UI.showToast('Produk berhasil ditambahkan');
+      }
 
-    UI.closeProductModal();
-    this.renderTable(document.getElementById('searchInput')?.value || '');
+      UI.closeProductModal();
+      await this.renderTable(document.getElementById('searchInput')?.value || '');
 
-    // Refresh dashboard
-    if (typeof Dashboard !== 'undefined') {
-      Dashboard.refresh();
+      // Refresh dashboard
+      if (typeof Dashboard !== 'undefined') {
+        Dashboard.refresh();
+      }
+    } catch (error) {
+      console.error('Error saving product:', error);
+      UI.showToast('Gagal menyimpan produk', 'error');
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Simpan';
+      }
     }
   },
 
   /**
-   * Edit product
+   * Edit product (async)
    */
-  editProduct(id) {
-    const product = Storage.getProduct(id);
-    if (product) {
-      UI.openProductModal(product);
+  async editProduct(id) {
+    try {
+      const product = await Storage.getProduct(id);
+      if (product) {
+        UI.openProductModal(product);
+      }
+    } catch (error) {
+      console.error('Error loading product:', error);
+      UI.showToast('Gagal memuat produk', 'error');
     }
   },
 

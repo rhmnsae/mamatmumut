@@ -59,10 +59,17 @@ const UI = {
             emptyState: document.getElementById('emptyState'),
 
             // Toast
-            toastContainer: document.getElementById('toastContainer')
+            toastContainer: document.getElementById('toastContainer'),
+
+            // Mobile Search
+            floatingSearchBtn: document.getElementById('floatingSearchBtn'),
+            mobileSearchOverlay: document.getElementById('mobileSearchOverlay'),
+            mobileSearchInput: document.getElementById('mobileSearchInput'),
+            mobileSearchClose: document.getElementById('mobileSearchClose')
         };
 
         this.setupEventListeners();
+        this.setupMobileSearch();
     },
 
     /**
@@ -167,6 +174,73 @@ const UI = {
                 this.handleImageUpload(file);
             }
         });
+    },
+
+    /**
+     * Setup mobile search functionality
+     */
+    setupMobileSearch() {
+        const { floatingSearchBtn, mobileSearchOverlay, mobileSearchInput, mobileSearchClose } = this.elements;
+
+        if (!floatingSearchBtn || !mobileSearchOverlay) return;
+
+        // Initially hide floating button (will be shown on products page)
+        floatingSearchBtn.classList.add('hidden');
+
+        // Open mobile search overlay
+        floatingSearchBtn.addEventListener('click', () => {
+            this.openMobileSearch();
+        });
+
+        // Close on close button click
+        mobileSearchClose.addEventListener('click', () => {
+            this.closeMobileSearch();
+        });
+
+        // Close on backdrop click
+        mobileSearchOverlay.addEventListener('click', (e) => {
+            if (e.target === mobileSearchOverlay) {
+                this.closeMobileSearch();
+            }
+        });
+
+        // Handle search input
+        mobileSearchInput.addEventListener('input', (e) => {
+            const searchQuery = e.target.value;
+            // Sync with desktop search input if it exists
+            const desktopSearch = document.getElementById('searchInput');
+            if (desktopSearch) {
+                desktopSearch.value = searchQuery;
+            }
+            // Trigger search
+            Products.renderTable(searchQuery);
+        });
+
+        // Close on Enter key
+        mobileSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.closeMobileSearch();
+            }
+        });
+    },
+
+    /**
+     * Open mobile search overlay
+     */
+    openMobileSearch() {
+        this.elements.mobileSearchOverlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            this.elements.mobileSearchInput.focus();
+        }, 300);
+    },
+
+    /**
+     * Close mobile search overlay
+     */
+    closeMobileSearch() {
+        this.elements.mobileSearchOverlay.classList.remove('open');
+        document.body.style.overflow = '';
     },
 
     /**
@@ -289,6 +363,20 @@ const UI = {
         // Close mobile sidebar
         this.closeSidebar();
 
+        // Toggle floating search button visibility (only show on products page)
+        if (this.elements.floatingSearchBtn) {
+            if (page === 'products') {
+                this.elements.floatingSearchBtn.classList.remove('hidden');
+            } else {
+                this.elements.floatingSearchBtn.classList.add('hidden');
+                // Clear mobile search input when leaving products page
+                if (this.elements.mobileSearchInput) {
+                    this.elements.mobileSearchInput.value = '';
+                }
+                this.closeMobileSearch();
+            }
+        }
+
         // Refresh dashboard data if needed
         if (page === 'dashboard' && typeof Dashboard !== 'undefined') {
             Dashboard.refresh();
@@ -380,7 +468,6 @@ const UI = {
             document.getElementById('productId').value = product.id;
             document.getElementById('productName').value = product.name;
             document.getElementById('productSku').value = product.sku || '';
-            document.getElementById('productCategory').value = product.category || '';
             document.getElementById('productOriginalPrice').value = product.originalPrice || '';
             document.getElementById('productSalePrice').value = product.salePrice;
             document.getElementById('productStock').value = product.stock;
@@ -432,19 +519,24 @@ const UI = {
     },
 
     /**
-     * Confirm delete action
+     * Confirm delete action (async)
      */
-    confirmDelete() {
+    async confirmDelete() {
         if (this.deleteProductId) {
-            Storage.deleteProduct(this.deleteProductId);
-            this.showToast('Produk berhasil dihapus', 'info');
-            Products.renderTable(document.getElementById('searchInput')?.value || '');
+            try {
+                await Storage.deleteProduct(this.deleteProductId);
+                this.showToast('Produk berhasil dihapus', 'info');
+                await Products.renderTable(document.getElementById('searchInput')?.value || '');
 
-            // Refresh dashboard and stock pages
-            if (typeof Dashboard !== 'undefined') {
-                Dashboard.refresh();
-                Dashboard.renderOutOfStockPage();
-                Dashboard.renderLowStockPage();
+                // Refresh dashboard and stock pages
+                if (typeof Dashboard !== 'undefined') {
+                    Dashboard.refresh();
+                    Dashboard.renderOutOfStockPage();
+                    Dashboard.renderLowStockPage();
+                }
+            } catch (error) {
+                console.error('Error deleting product:', error);
+                this.showToast('Gagal menghapus produk', 'error');
             }
         }
         this.closeDeleteModal();
