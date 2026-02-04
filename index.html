@@ -626,6 +626,37 @@
     <script src="js/products.js"></script>
     <script src="js/export.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Theme Toggle Reinitializer (ensures toggle works after all scripts load) -->
+    <script>
+        (function () {
+            const toggle = document.getElementById('themeToggle');
+            if (toggle) {
+                // Remove old listeners by cloning
+                const newToggle = toggle.cloneNode(true);
+                toggle.parentNode.replaceChild(newToggle, toggle);
+
+                newToggle.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const html = document.documentElement;
+                    const isLightMode = html.getAttribute('data-theme') === 'light';
+
+                    if (isLightMode) {
+                        html.removeAttribute('data-theme');
+                        localStorage.setItem('latranshop_theme', 'dark');
+                        console.log('🎨 Switched to dark mode');
+                    } else {
+                        html.setAttribute('data-theme', 'light');
+                        localStorage.setItem('latranshop_theme', 'light');
+                        console.log('🎨 Switched to light mode');
+                    }
+                });
+                console.log('🎨 Theme toggle initialized');
+            }
+        })();
+    </script>
 </body>
 
 </html>
