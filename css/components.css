@@ -1239,11 +1239,10 @@ input[type="number"]::-webkit-outer-spin-button {
         color: var(--accent-text);
         align-items: center;
         justify-content: center;
-        box-shadow: var(--shadow-lg), var(--shadow-glow);
+        box-shadow: none;
         cursor: pointer;
         z-index: 90;
         transition: all var(--transition-fast);
-        animation: floatPulse 2s ease-in-out infinite;
     }
 
     .floating-search-btn svg {
