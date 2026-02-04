@@ -37,7 +37,7 @@ const ApiClient = {
     async isAvailable() {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 detik timeout
 
             const response = await fetch(`${this.SUPABASE_URL}/rest/v1/products?order=created_at.desc`, {
                 method: 'GET',
@@ -52,14 +52,15 @@ const ApiClient = {
                 // Format products from snake_case to camelCase
                 this._cachedProducts = data.map(p => this._formatProduct(p));
                 this._isApiAvailable = true;
-                console.log('🌐 Supabase online - data dimuat');
+                console.log(`🌐 Supabase online - ${data.length} produk dimuat`);
                 return true;
             }
 
+            console.error('❌ Supabase response not ok:', response.status, response.statusText);
             this._isApiAvailable = false;
             return false;
         } catch (e) {
-            console.warn('⚠️ Supabase offline - menggunakan data lokal');
+            console.warn('⚠️ Supabase offline - menggunakan data lokal:', e.message);
             this._isApiAvailable = false;
             this._cachedProducts = null;
             return false;
