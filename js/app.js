@@ -61,6 +61,7 @@ const App = {
             Products.init();
             Export.init();
             this.setupLogout();
+            this.setupThemeToggle();
 
             // CRITICAL: Wait for Storage.init() to complete
             // This ensures data is fetched from API if localStorage is empty (new device)
@@ -117,6 +118,37 @@ const App = {
                 }
             });
         }
+    },
+
+    /**
+     * Setup theme toggle (dark/light mode)
+     */
+    setupThemeToggle() {
+        const toggle = document.getElementById('themeToggle');
+        if (!toggle) return;
+
+        toggle.addEventListener('click', () => {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            // Apply theme
+            if (newTheme === 'dark') {
+                html.removeAttribute('data-theme');
+            } else {
+                html.setAttribute('data-theme', newTheme);
+            }
+
+            // Save to localStorage
+            localStorage.setItem('latranshop_theme', newTheme === 'dark' ? '' : newTheme);
+
+            // Update aria-label for accessibility
+            toggle.setAttribute('aria-label',
+                newTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'
+            );
+
+            console.log(`🎨 Theme switched to ${newTheme} mode`);
+        });
     }
 };
 
