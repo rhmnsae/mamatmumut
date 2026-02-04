@@ -407,7 +407,10 @@ const Dashboard = {
 
         try {
             const allProducts = await Storage.getProducts();
-            const products = allProducts.slice(0, 5);
+            // Sort by createdAt descending (newest first) and take first 5
+            const products = [...allProducts]
+                .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                .slice(0, 5);
 
             if (products.length === 0) {
                 container.innerHTML = `
