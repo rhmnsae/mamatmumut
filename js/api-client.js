@@ -39,7 +39,7 @@ const ApiClient = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 detik timeout
 
-            const response = await fetch(`${this.SUPABASE_URL}/rest/v1/products?order=created_at.desc`, {
+            const response = await fetch(`${this.SUPABASE_URL}/rest/v1/products?order=created_at.asc`, {
                 method: 'GET',
                 headers: this.getHeaders(),
                 signal: controller.signal
@@ -139,7 +139,7 @@ const ApiClient = {
      * Get all products
      */
     async getProducts() {
-        const result = await this.request('products?order=created_at.desc');
+        const result = await this.request('products?order=created_at.asc');
         return result.map(p => this._formatProduct(p));
     },
 
@@ -156,7 +156,7 @@ const ApiClient = {
      */
     async searchProducts(query) {
         const encoded = encodeURIComponent(`%${query}%`);
-        const result = await this.request(`products?or=(name.ilike.${encoded},sku.ilike.${encoded})&order=created_at.desc`);
+        const result = await this.request(`products?or=(name.ilike.${encoded},sku.ilike.${encoded})&order=created_at.asc`);
         return result.map(p => this._formatProduct(p));
     },
 
