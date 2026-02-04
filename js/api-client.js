@@ -49,7 +49,8 @@ const ApiClient = {
 
             if (response.ok) {
                 const data = await response.json();
-                this._cachedProducts = data;
+                // Format products from snake_case to camelCase
+                this._cachedProducts = data.map(p => this._formatProduct(p));
                 this._isApiAvailable = true;
                 console.log('🌐 Supabase online - data dimuat');
                 return true;
@@ -137,7 +138,8 @@ const ApiClient = {
      * Get all products
      */
     async getProducts() {
-        return this.request('products?order=created_at.desc');
+        const result = await this.request('products?order=created_at.desc');
+        return result.map(p => this._formatProduct(p));
     },
 
     /**
