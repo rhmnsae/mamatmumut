@@ -14,15 +14,9 @@ const Auth = {
      * Initialize auth system
      */
     async init() {
-        // Try to init admin on server
-        try {
-            await ApiClient.initAdmin();
-            console.log('🔐 Auth initialized from API');
-        } catch (e) {
-            console.warn('⚠️ Could not init admin on server:', e.message);
-            // Fallback: create local admin
-            await this._initLocalAdmin();
-        }
+        // Initialize local admin for authentication
+        await this._initLocalAdmin();
+        console.log('🔐 Auth initialized');
     },
 
     /**
@@ -81,30 +75,8 @@ const Auth = {
      * Login with username and password
      */
     async login(username, password) {
-        // Try API first
-        try {
-            const result = await ApiClient.login(username, password);
-
-            if (result.success) {
-                // Save session
-                const session = {
-                    userId: result.user.id,
-                    username: result.user.username,
-                    role: result.user.role,
-                    loginAt: new Date().toISOString(),
-                    isOnline: true
-                };
-
-                localStorage.setItem(this.KEYS.SESSION, JSON.stringify(session));
-
-                return { success: true, user: session };
-            }
-
-            return result;
-        } catch (e) {
-            console.warn('API login failed, trying local:', e.message);
-            return await this._localLogin(username, password);
-        }
+        // Use local authentication
+        return await this._localLogin(username, password);
     },
 
     /**
@@ -141,12 +113,6 @@ const Auth = {
      * Logout current user
      */
     async logout() {
-        try {
-            await ApiClient.logout();
-        } catch (e) {
-            // Ignore
-        }
-
         localStorage.removeItem(this.KEYS.SESSION);
         localStorage.removeItem(this.KEYS.TOKEN);
     },
@@ -156,10 +122,8 @@ const Auth = {
      */
     isLoggedIn() {
         const session = this.getSession();
-        const token = ApiClient.getToken();
-
-        // Has session (either online or offline)
-        return session !== null || token !== null;
+        // Only check local session (no token-based auth with Supabase anon key)
+        return session !== null;
     },
 
     /**
@@ -175,21 +139,11 @@ const Auth = {
     },
 
     /**
-     * Verify authentication status with server
+     * Verify authentication status
      */
     async verifyAuth() {
-        try {
-            const isValid = await ApiClient.checkAuth();
-            if (!isValid) {
-                // Clear local session if server says not authenticated
-                this.logout();
-                return false;
-            }
-            return true;
-        } catch (e) {
-            // If can't reach server, rely on local session
-            return this.getSession() !== null;
-        }
+        // Simply check if local session exists
+        return this.getSession() !== null;
     },
 
     /**
