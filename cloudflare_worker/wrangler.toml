@@ -1,0 +1,11 @@
+name = "latranshop-api"
+main = "worker.js"
+compatibility_date = "2024-02-04"
+
+# Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "latranshop-db"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+# Enable CORS (handled in code, but good practice to allow at edge if needed, mainly code)

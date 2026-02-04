@@ -7,7 +7,8 @@ const ApiClient = {
     // ================================
     // KONFIGURASI - GANTI DENGAN URL API ANDA
     // ================================
-    BASE_URL: 'http://localhost/latranshop/api', // Ganti dengan URL hosting Anda
+    // BASE_URL: 'http://localhost/latranshop/api', // OLD (Localhost)
+    BASE_URL: 'https://replace-me-with-your.workers.dev/api', // NEW (Update with your Cloudflare Worker URL)
 
     // Token storage key
     TOKEN_KEY: 'latranshop_auth_token',
