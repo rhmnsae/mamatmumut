@@ -246,10 +246,65 @@ const UI = {
     /**
      * Handle image upload
      */
+    /**
+     * Handle image upload with compression
+     */
+    /**
+     * Handle image upload with compression
+     */
     handleImageUpload(file) {
+        // Show loading state for preview
+        this.elements.uploadPreview.innerHTML = '<div class="text-sm text-muted">Mengompres gambar...</div>';
+
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.showImagePreview(e.target.result);
+            const img = new Image();
+            img.src = e.target.result;
+
+            img.onload = () => {
+                // Compression Config
+                const MAX_WIDTH = 600; // Reduced to 600 for safety
+                const MAX_HEIGHT = 600;
+                const QUALITY = 0.6; // Reduced to 60% quality
+
+                let width = img.width;
+                let height = img.height;
+
+                // Calculate new dimensions
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                // Draw to canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Export compressed image
+                // Ensure output is always under ~50KB if possible
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', QUALITY);
+
+                // Show preview and store
+                this.showImagePreview(compressedDataUrl);
+
+                // Verify size
+                const sizeKB = Math.round(compressedDataUrl.length / 1024);
+                console.log(`Image compressed: ${sizeKB}KB (Original: ${Math.round(file.size / 1024)}KB)`);
+
+                if (sizeKB > 100) {
+                    UI.showToast('Ukuran gambar masih terlalu besar, coba gambar lain', 'warning');
+                }
+            };
         };
         reader.readAsDataURL(file);
     },
@@ -569,19 +624,42 @@ const UI = {
         const icons = {
             success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
             error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+            warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
         };
 
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        toast.innerHTML = `${icons[type]}<span>${message}</span>`;
+        // Allow user to close error toasts manually if they are long
+        if (type === 'error') {
+            toast.style.paddingRight = '30px';
+        }
+
+        toast.innerHTML = `${icons[type] || icons.info}<span>${message}</span>`;
+
+        // Add close button for errors
+        if (type === 'error') {
+            const close = document.createElement('button');
+            close.innerHTML = '×';
+            close.className = 'toast-close';
+            close.style.cssText = 'position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 20px; cursor: pointer; color: currentColor; opacity: 0.7;';
+            close.onclick = () => toast.remove();
+            toast.appendChild(close);
+        }
 
         this.elements.toastContainer.appendChild(toast);
 
+        // Auto hide (longer for errors)
+        const duration = type === 'error' ? 6000 : 3000;
+
         setTimeout(() => {
-            toast.style.animation = 'slideUp 0.3s ease reverse';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+            if (document.body.contains(toast)) {
+                toast.style.animation = 'slideUp 0.3s ease reverse';
+                setTimeout(() => {
+                    if (document.body.contains(toast)) toast.remove();
+                }, 300);
+            }
+        }, duration);
     },
 
     /**

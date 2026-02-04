@@ -4,41 +4,66 @@
  */
 
 const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
     'Access-Control-Allow-Credentials': 'true',
 };
 
+function getCorsHeaders(request) {
+    const origin = request.headers.get('Origin');
+    // For now, allow all origins by echoing back the request origin
+    // In production, you might want to validate against a whitelist
+    return {
+        ...CORS_HEADERS,
+        'Access-Control-Allow-Origin': origin || '*'
+    };
+}
+
 export default {
     async fetch(request, env) {
         if (request.method === 'OPTIONS') {
-            return new Response(null, { headers: CORS_HEADERS });
+            return new Response(null, { headers: getCorsHeaders(request) });
         }
 
         const url = new URL(request.url);
         const path = url.pathname;
 
+        let response;
+
         try {
             if (path.endsWith('/api/auth.php')) {
-                return await handleAuth(request, env);
+                response = await handleAuth(request, env);
             }
-            if (path.endsWith('/api/products.php')) {
-                return await handleProducts(request, env);
+            else if (path.endsWith('/api/products.php')) {
+                response = await handleProducts(request, env);
             }
-            if (path.endsWith('/api/categories.php')) {
-                return await handleCategories(request, env);
+            else if (path.endsWith('/api/categories.php')) {
+                response = await handleCategories(request, env);
             }
-            if (path.endsWith('/api/upload.php')) {
+            else if (path.endsWith('/api/upload.php')) {
                 // Fallback to Base64 (Client handles error)
-                return jsonResponse({ error: 'Upload not supported in free version' }, 400);
+                response = jsonResponse({ error: 'Upload not supported in free version' }, 400);
             }
-
-            return new Response('Not Found', { status: 404, headers: CORS_HEADERS });
+            else {
+                response = new Response('Not Found', { status: 404 });
+            }
 
         } catch (err) {
-            return jsonResponse({ error: err.message }, 500);
+            response = jsonResponse({ error: err.message }, 500);
         }
+
+        // Apply CORS headers to response
+        const newHeaders = new Headers(response.headers);
+        const cors = getCorsHeaders(request);
+        for (const [key, value] of Object.entries(cors)) {
+            newHeaders.set(key, value);
+        }
+
+        return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders
+        });
     }
 };
 
@@ -255,8 +280,7 @@ function jsonResponse(data, status = 200) {
     return new Response(JSON.stringify(data), {
         status,
         headers: {
-            'Content-Type': 'application/json',
-            ...CORS_HEADERS
+            'Content-Type': 'application/json'
         }
     });
 }

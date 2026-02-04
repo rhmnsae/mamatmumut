@@ -8,7 +8,7 @@ const ApiClient = {
     // KONFIGURASI - GANTI DENGAN URL API ANDA
     // ================================
     // BASE_URL: 'http://localhost/latranshop/api', // OLD (Localhost)
-    BASE_URL: 'https://replace-me-with-your.workers.dev/api', // NEW (Update with your Cloudflare Worker URL)
+    BASE_URL: 'https://latranshop-api.saepulrohman3445.workers.dev/api', // NEW (Update with your Cloudflare Worker URL)
 
     // Token storage key
     TOKEN_KEY: 'latranshop_auth_token',
@@ -124,6 +124,11 @@ const ApiClient = {
             if (error.name === 'AbortError') {
                 this._isApiAvailable = false;
                 console.warn('API request timeout - switching to offline mode');
+                throw new Error('Koneksi lambat/timeout. Beralih ke mode offline.');
+            }
+
+            if (!navigator.onLine) {
+                throw new Error('Tidak ada koneksi internet.');
             }
 
             console.error(`API Error [${endpoint}]:`, error);

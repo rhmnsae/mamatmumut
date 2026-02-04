@@ -27,14 +27,17 @@ const Storage = {
 
     if (apiAvailable) {
       try {
-        // Fetch both in parallel for speed
+        // 1. SYNC FIRST: Try to push any offline changes to server
+        await this.sync();
+
+        // 2. FETCH FRESH DATA: Fetch both in parallel for speed
         const [products, categories] = await Promise.all([
           this._fetchProducts(),
           this._fetchCategories()
         ]);
-        console.log('📦 Storage initialized from API');
+        console.log('📦 Storage initialized from API (Synced & Fetched)');
       } catch (e) {
-        console.warn('⚠️ API error, using localStorage fallback');
+        console.warn('⚠️ API error during init, using localStorage fallback');
         this._offlineMode = true;
       }
     } else {
@@ -43,6 +46,60 @@ const Storage = {
       // Load from localStorage immediately
       this._loadFromLocalStorage();
     }
+  },
+
+  /**
+   * Sync local changes to API
+   */
+  async sync() {
+    console.log('🔄 Syncing data...');
+    this._loadFromLocalStorage(); // Ensure cache is loaded
+
+    if (!this._productsCache) return;
+
+    // Find unsynced products
+    const unsynced = this._productsCache.filter(p => p._synced === false);
+
+    if (unsynced.length === 0) {
+      console.log('✨ Nothing to sync');
+      return;
+    }
+
+    console.log(`🔄 Syncing ${unsynced.length} items...`);
+
+    // Process each unsynced item
+    for (const product of unsynced) {
+      try {
+        // If it has a temporary ID (generated locally), it's a NEW product
+        // Note: We use a simple check, validation happens on server
+        // But simplified: effectively we treat all unsynced as "upsert" candidates if possible
+        // For this simple app, we'll try to CREATE if it looks new (no numeric ID or similar)
+        // However, our local IDs are timestamps. Data from server might use D1 IDs (integers ok? No D1 uses what we give or autoincrement?)
+        // Schema uses TEXT ID. Workers generates UUID/Timestamp.
+        // So we can just try to CREATE it. If it exists, we might need UPDATE.
+        // Best strategy for simple sync:
+        // 1. Try to GET it. If exists -> UPDATE. If 404 -> CREATE.
+
+        const exists = await ApiClient.getProduct(product.id).catch(() => null);
+
+        if (exists) {
+          await ApiClient.updateProduct(product.id, product);
+        } else {
+          await ApiClient.createProduct(product);
+        }
+
+        // Mark as synced locally
+        product._synced = true;
+
+      } catch (err) {
+        console.error(`❌ Sync failed for ${product.id}:`, err);
+        // Keep _synced = false to try again later
+      }
+    }
+
+    // Save updated _synced status to local
+    localStorage.setItem('produk_manager_products', JSON.stringify(this._productsCache));
+    console.log('✅ Sync completed');
   },
 
   /**
@@ -179,20 +236,23 @@ const Storage = {
       return newProduct;
     } catch (e) {
       console.warn('API failed, saving to localStorage:', e);
-      return this._addProductLocal(product);
+      // Mark as offline for subsequent calls
+      // this._offlineMode = true; // Optional: Force offline mode? Maybe just fallback once.
+      return this._addProductLocal(product, false); // false = not synced
     }
   },
 
   /**
    * Add product to localStorage (internal)
    */
-  async _addProductLocal(product) {
+  async _addProductLocal(product, synced = true) {
     const products = await this.getProducts();
     const newProduct = {
       ...product,
       id: this.generateId(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      _synced: synced // Mark sync status
     };
     products.unshift(newProduct);
     localStorage.setItem('produk_manager_products', JSON.stringify(products));
@@ -215,21 +275,22 @@ const Storage = {
       return await ApiClient.updateProduct(id, updates);
     } catch (e) {
       console.warn('API failed, updating localStorage:', e);
-      return this._updateProductLocal(id, updates);
+      return this._updateProductLocal(id, updates, false);
     }
   },
 
   /**
    * Update product in localStorage (internal)
    */
-  async _updateProductLocal(id, updates) {
+  async _updateProductLocal(id, updates, synced = true) {
     const products = await this.getProducts();
     const index = products.findIndex(p => p.id === id || p.id === parseInt(id));
     if (index !== -1) {
       products[index] = {
         ...products[index],
         ...updates,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        _synced: synced
       };
       localStorage.setItem('produk_manager_products', JSON.stringify(products));
       this._productsCache = products;
@@ -254,7 +315,7 @@ const Storage = {
       return true;
     } catch (e) {
       console.warn('API failed, deleting from localStorage:', e);
-      return this._deleteProductLocal(id);
+      return this._deleteProductLocal(id); // NOTE: Deletes locally, but server might still have it. Sync delete is harder.
     }
   },
 
