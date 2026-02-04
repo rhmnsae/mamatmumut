@@ -18,6 +18,9 @@
     <!-- Chart.js for Dashboard -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
     <!-- Stylesheets -->
     <link rel="stylesheet" href="css/variables.css">
     <link rel="stylesheet" href="css/base.css">
@@ -267,8 +270,20 @@
                                             <span class="spec-value" id="productDetailWeight">-</span>
                                         </div>
                                         <div class="product-detail-spec">
-                                            <span class="spec-label">Dimensi</span>
-                                            <span class="spec-value" id="productDetailDimensions">-</span>
+                                            <span class="spec-label">Ukuran</span>
+                                            <span class="spec-value" id="productDetailSize">-</span>
+                                        </div>
+                                        <div class="product-detail-spec">
+                                            <span class="spec-label">Panjang Bawahan</span>
+                                            <span class="spec-value" id="productDetailPanjangBawahan">-</span>
+                                        </div>
+                                        <div class="product-detail-spec">
+                                            <span class="spec-label">Lingkar Pinggang</span>
+                                            <span class="spec-value" id="productDetailLingkarPinggang">-</span>
+                                        </div>
+                                        <div class="product-detail-spec">
+                                            <span class="spec-label">Lingkar Paha</span>
+                                            <span class="spec-value" id="productDetailLingkarPaha">-</span>
                                         </div>
                                     </div>
                                 </div>
@@ -315,7 +330,7 @@
                                     <th style="min-width: 120px;" class="text-right">Harga Asli</th>
                                     <th style="min-width: 120px;" class="text-right">Harga Jual</th>
                                     <th style="min-width: 80px;" class="text-right">Berat</th>
-                                    <th style="min-width: 100px;">Dimensi</th>
+                                    <th style="min-width: 80px;" class="text-center">Ukuran</th>
                                     <th style="width: 70px;" class="text-center">Stok</th>
                                     <th style="width: 90px;" class="text-right">Aksi</th>
                                 </thead>
@@ -410,13 +425,33 @@
                             <input type="number" class="form-input" id="productWeight" placeholder="500" min="0">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Dimensi P×L×T (cm)</label>
-                            <div class="dimension-inputs">
-                                <input type="number" class="form-input" id="productLength" placeholder="P" min="0">
-                                <input type="number" class="form-input" id="productWidth" placeholder="L" min="0">
-                                <input type="number" class="form-input" id="productHeight" placeholder="T" min="0">
-                            </div>
+                            <label class="form-label" for="productSize">Ukuran</label>
+                            <select class="form-input" id="productSize">
+                                <option value="">Pilih Ukuran</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                                <option value="XXL">XXL</option>
+                                <option value="XXXL">XXXL</option>
+                            </select>
                         </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="productPanjangBawahan">Panjang Bawahan (cm)</label>
+                            <input type="number" class="form-input" id="productPanjangBawahan" placeholder="100"
+                                min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="productLingkarPinggang">Lingkar Pinggang (cm)</label>
+                            <input type="number" class="form-input" id="productLingkarPinggang" placeholder="80"
+                                min="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="productLingkarPaha">Lingkar Paha (cm)</label>
+                        <input type="number" class="form-input" id="productLingkarPaha" placeholder="60" min="0">
                     </div>
 
                     <div class="form-group">

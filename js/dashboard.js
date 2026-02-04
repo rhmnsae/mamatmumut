@@ -354,14 +354,28 @@ const Dashboard = {
                 weightEl.textContent = product.weight ? `${product.weight} gram` : '-';
             }
 
-            // Update dimensions
-            const dimensionsEl = document.getElementById('productDetailDimensions');
-            if (dimensionsEl) {
-                if (product.dimensions && (product.dimensions.l || product.dimensions.w || product.dimensions.h)) {
-                    dimensionsEl.textContent = `${product.dimensions.l || 0} × ${product.dimensions.w || 0} × ${product.dimensions.h || 0} cm`;
-                } else {
-                    dimensionsEl.textContent = '-';
-                }
+            // Update size (clothing)
+            const sizeEl = document.getElementById('productDetailSize');
+            if (sizeEl) {
+                sizeEl.textContent = product.size || '-';
+            }
+
+            // Update panjang bawahan
+            const panjangBawahanEl = document.getElementById('productDetailPanjangBawahan');
+            if (panjangBawahanEl) {
+                panjangBawahanEl.textContent = product.panjangBawahan ? `${product.panjangBawahan} cm` : '-';
+            }
+
+            // Update lingkar pinggang
+            const lingkarPinggangEl = document.getElementById('productDetailLingkarPinggang');
+            if (lingkarPinggangEl) {
+                lingkarPinggangEl.textContent = product.lingkarPinggang ? `${product.lingkarPinggang} cm` : '-';
+            }
+
+            // Update lingkar paha
+            const lingkarPahaEl = document.getElementById('productDetailLingkarPaha');
+            if (lingkarPahaEl) {
+                lingkarPahaEl.textContent = product.lingkarPaha ? `${product.lingkarPaha} cm` : '-';
             }
 
             // Bind action buttons

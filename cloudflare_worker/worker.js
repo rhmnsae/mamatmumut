@@ -31,16 +31,14 @@ export default {
         let response;
 
         try {
-            if (path.endsWith('/api/auth.php')) {
+            // Support both /api/products and /api/products.php for backwards compatibility
+            if (path.endsWith('/api/auth.php') || path.endsWith('/api/auth')) {
                 response = await handleAuth(request, env);
             }
-            else if (path.endsWith('/api/products.php')) {
+            else if (path.endsWith('/api/products.php') || path.endsWith('/api/products')) {
                 response = await handleProducts(request, env);
             }
-            else if (path.endsWith('/api/categories.php')) {
-                response = await handleCategories(request, env);
-            }
-            else if (path.endsWith('/api/upload.php')) {
+            else if (path.endsWith('/api/upload.php') || path.endsWith('/api/upload')) {
                 // Fallback to Base64 (Client handles error)
                 response = jsonResponse({ error: 'Upload not supported in free version' }, 400);
             }
@@ -177,24 +175,24 @@ async function handleProducts(request, env) {
         const newId = generateId();
 
         // Handle image: Frontend sends base64 or URL. We save it to image_url.
-        // If it's base64, it might be large, but D1 supports Text up to a limit.
+        // IMPORTANT: D1 doesn't accept 'undefined' values, must convert to null
 
         await env.DB.prepare(`
-      INSERT INTO products (id, name, sku, category, original_price, sale_price, stock, weight, dimension_l, dimension_w, dimension_h, image_url)
+      INSERT INTO products (id, name, sku, original_price, sale_price, stock, weight, size, panjang_bawahan, lingkar_pinggang, lingkar_paha, image_url)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
             newId,
-            data.name,
-            data.sku,
-            data.category,
-            data.originalPrice || 0,
-            data.salePrice || 0,
-            data.stock || 0,
-            data.weight || 0,
-            data.dimensions?.l || 0,
-            data.dimensions?.w || 0,
-            data.dimensions?.h || 0,
-            data.image || null
+            data.name ?? null,
+            data.sku ?? null,
+            data.originalPrice ?? 0,
+            data.salePrice ?? 0,
+            data.stock ?? 0,
+            data.weight ?? 0,
+            data.size ?? null,
+            data.panjangBawahan ?? 0,
+            data.lingkarPinggang ?? 0,
+            data.lingkarPaha ?? 0,
+            data.image ?? null
         ).run();
 
         return jsonResponse({ success: true, id: newId, ...data });
@@ -210,14 +208,14 @@ async function handleProducts(request, env) {
         const fields = {
             name: data.name,
             sku: data.sku,
-            category: data.category,
             original_price: data.originalPrice,
             sale_price: data.salePrice,
             stock: data.stock,
             weight: data.weight,
-            dimension_l: data.dimensions?.l,
-            dimension_w: data.dimensions?.w,
-            dimension_h: data.dimensions?.h,
+            size: data.size,
+            panjang_bawahan: data.panjangBawahan,
+            lingkar_pinggang: data.lingkarPinggang,
+            lingkar_paha: data.lingkarPaha,
             image_url: data.image
         };
 
@@ -238,36 +236,6 @@ async function handleProducts(request, env) {
     if (method === 'DELETE') {
         if (!id) return jsonResponse({ error: 'Missing ID' }, 400);
         await env.DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-        return jsonResponse({ success: true });
-    }
-}
-
-async function handleCategories(request, env) {
-    const method = request.method;
-    const url = new URL(request.url);
-
-    if (method === 'GET') {
-        const cats = await env.DB.prepare("SELECT name FROM categories ORDER BY name").all();
-        return jsonResponse(cats.results.map(c => c.name));
-    }
-
-    if (method === 'POST') {
-        const data = await request.json();
-        if (!data.name) return jsonResponse({ error: 'Name required' }, 400);
-
-        try {
-            await env.DB.prepare("INSERT INTO categories (name) VALUES (?)").bind(data.name).run();
-            return jsonResponse({ success: true });
-        } catch (e) {
-            return jsonResponse({ success: false, message: 'Category exists' }, 400);
-        }
-    }
-
-    if (method === 'DELETE') {
-        const name = url.searchParams.get('name');
-        if (!name) return jsonResponse({ error: 'Name required' }, 400);
-
-        await env.DB.prepare("DELETE FROM categories WHERE name = ?").bind(name).run();
         return jsonResponse({ success: true });
     }
 }
@@ -303,13 +271,21 @@ function generateId() {
 }
 
 function formatProductDimensions(p) {
+    // Legacy dimension support (can be removed if no longer needed)
     p.dimensions = {
         l: p.dimension_l,
         w: p.dimension_w,
         h: p.dimension_h
     };
+    // Price mapping
     p.originalPrice = p.original_price;
     p.salePrice = p.sale_price;
     p.image = p.image_url;
-    // Cleanup db specific fields if needed, but JS handles extra keys fine
+
+    // New clothing size fields (snake_case to camelCase)
+    p.panjangBawahan = p.panjang_bawahan;
+    p.lingkarPinggang = p.lingkar_pinggang;
+    p.lingkarPaha = p.lingkar_paha;
+    p.createdAt = p.created_at;
+    p.updatedAt = p.updated_at;
 }

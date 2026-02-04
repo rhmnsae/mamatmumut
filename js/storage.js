@@ -9,97 +9,122 @@
 const Storage = {
   // Cache untuk mengurangi API calls
   _productsCache: null,
-  _categoriesCache: null,
   _lastFetch: null,
 
-  // Cache duration (30 detik untuk performance)
-  CACHE_DURATION: 30000,
+  // Cache duration (15 detik untuk data lebih segar)
+  CACHE_DURATION: 15000,
 
   // Flag untuk mode offline
   _offlineMode: false,
 
+  // Flag untuk background sync
+  _isSyncing: false,
+
   /**
-   * Initialize storage
+   * Initialize storage - FAST ONLINE LOADING
+   * Data online diambil bersamaan dengan cek API (hanya 1x fetch!)
+   * Fallback ke localStorage hanya jika offline
    */
   async init() {
-    // Quick check if API is available
+    console.log('🚀 Memulai loading data...');
+
+    // Load localStorage in parallel (for fallback only)
+    this._loadFromLocalStorage();
+
+    // Check API availability - this ALSO fetches products data in one call!
     const apiAvailable = await ApiClient.isAvailable();
 
     if (apiAvailable) {
-      try {
-        // 1. SYNC FIRST: Try to push any offline changes to server
-        await this.sync();
+      this._offlineMode = false;
 
-        // 2. FETCH FRESH DATA: Fetch both in parallel for speed
-        const [products, categories] = await Promise.all([
-          this._fetchProducts(),
-          this._fetchCategories()
-        ]);
-        console.log('📦 Storage initialized from API (Synced & Fetched)');
-      } catch (e) {
-        console.warn('⚠️ API error during init, using localStorage fallback');
-        this._offlineMode = true;
+      // Use cached products from isAvailable() - NO DOUBLE FETCH!
+      const cachedProducts = ApiClient.getCachedProducts();
+      if (cachedProducts && Array.isArray(cachedProducts)) {
+        this._productsCache = cachedProducts;
+        this._lastFetch = Date.now();
+        localStorage.setItem('produk_manager_products', JSON.stringify(cachedProducts));
+        console.log(`✅ Data online berhasil dimuat: ${cachedProducts.length} produk`);
+      } else {
+        // Fallback: if cached products not available, fetch directly
+        console.log('⚠️ Cache kosong, mengambil data langsung dari API...');
+        try {
+          await this._fetchProducts();
+          console.log(`✅ Data fetched: ${this._productsCache?.length || 0} produk`);
+        } catch (e) {
+          console.warn('⚠️ Gagal fetch data:', e);
+        }
       }
     } else {
-      console.log('📦 Storage initialized from localStorage (offline mode)');
+      console.log('📦 Offline mode - menggunakan data lokal');
       this._offlineMode = true;
-      // Load from localStorage immediately
-      this._loadFromLocalStorage();
     }
   },
 
   /**
-   * Sync local changes to API
+   * Fetch fresh data from API in background without blocking
+   */
+  async _fetchInBackground() {
+    try {
+      // Fetch products from API
+      await this._fetchProducts();
+      console.log('📦 API data fetched in background');
+
+      // Sync unsynced items in background (don't await)
+      this._syncInBackground();
+    } catch (e) {
+      console.warn('⚠️ Background fetch failed, using localStorage');
+    }
+  },
+
+  /**
+   * Sync local changes to API in background (non-blocking)
+   */
+  async _syncInBackground() {
+    // Prevent multiple syncs
+    if (this._isSyncing) return;
+    this._isSyncing = true;
+
+    try {
+      if (!this._productsCache) return;
+
+      // Find unsynced products
+      const unsynced = this._productsCache.filter(p => p._synced === false);
+
+      if (unsynced.length === 0) {
+        return;
+      }
+
+      console.log(`🔄 Background sync: ${unsynced.length} items...`);
+
+      // Process all unsynced items in parallel for speed
+      const syncPromises = unsynced.map(async (product) => {
+        try {
+          // Try to create/update directly without checking first
+          await ApiClient.createProduct(product).catch(async () => {
+            // If create fails (maybe exists), try update
+            await ApiClient.updateProduct(product.id, product);
+          });
+          product._synced = true;
+        } catch (err) {
+          console.warn(`Sync failed for ${product.id}`);
+        }
+      });
+
+      await Promise.allSettled(syncPromises);
+
+      // Save updated _synced status
+      localStorage.setItem('produk_manager_products', JSON.stringify(this._productsCache));
+      console.log('✅ Background sync completed');
+    } finally {
+      this._isSyncing = false;
+    }
+  },
+
+  /**
+   * Manual sync (for explicit user action)
    */
   async sync() {
-    console.log('🔄 Syncing data...');
-    this._loadFromLocalStorage(); // Ensure cache is loaded
-
-    if (!this._productsCache) return;
-
-    // Find unsynced products
-    const unsynced = this._productsCache.filter(p => p._synced === false);
-
-    if (unsynced.length === 0) {
-      console.log('✨ Nothing to sync');
-      return;
-    }
-
-    console.log(`🔄 Syncing ${unsynced.length} items...`);
-
-    // Process each unsynced item
-    for (const product of unsynced) {
-      try {
-        // If it has a temporary ID (generated locally), it's a NEW product
-        // Note: We use a simple check, validation happens on server
-        // But simplified: effectively we treat all unsynced as "upsert" candidates if possible
-        // For this simple app, we'll try to CREATE if it looks new (no numeric ID or similar)
-        // However, our local IDs are timestamps. Data from server might use D1 IDs (integers ok? No D1 uses what we give or autoincrement?)
-        // Schema uses TEXT ID. Workers generates UUID/Timestamp.
-        // So we can just try to CREATE it. If it exists, we might need UPDATE.
-        // Best strategy for simple sync:
-        // 1. Try to GET it. If exists -> UPDATE. If 404 -> CREATE.
-
-        const exists = await ApiClient.getProduct(product.id).catch(() => null);
-
-        if (exists) {
-          await ApiClient.updateProduct(product.id, product);
-        } else {
-          await ApiClient.createProduct(product);
-        }
-
-        // Mark as synced locally
-        product._synced = true;
-
-      } catch (err) {
-        console.error(`❌ Sync failed for ${product.id}:`, err);
-        // Keep _synced = false to try again later
-      }
-    }
-
-    // Save updated _synced status to local
-    localStorage.setItem('produk_manager_products', JSON.stringify(this._productsCache));
-    console.log('✅ Sync completed');
+    return this._syncInBackground();
   },
 
   /**
@@ -107,19 +132,7 @@ const Storage = {
    */
   _loadFromLocalStorage() {
     const productsData = localStorage.getItem('produk_manager_products');
-    const categoriesData = localStorage.getItem('produk_manager_categories');
-
     this._productsCache = productsData ? JSON.parse(productsData) : [];
-    this._categoriesCache = categoriesData ? JSON.parse(categoriesData) : [
-      'Elektronik',
-      'Fashion',
-      'Makanan & Minuman',
-      'Kesehatan',
-      'Rumah Tangga',
-      'Olahraga',
-      'Hobi',
-      'Lainnya'
-    ];
     this._lastFetch = Date.now();
   },
 
@@ -142,7 +155,6 @@ const Storage = {
    */
   _invalidateCache() {
     this._productsCache = null;
-    this._categoriesCache = null;
     this._lastFetch = null;
   },
 
@@ -157,16 +169,6 @@ const Storage = {
     this._lastFetch = Date.now();
     localStorage.setItem('produk_manager_products', JSON.stringify(products));
     return products;
-  },
-
-  /**
-   * Fetch categories from API (internal)
-   */
-  async _fetchCategories() {
-    const categories = await ApiClient.getCategories();
-    this._categoriesCache = categories;
-    localStorage.setItem('produk_manager_categories', JSON.stringify(categories));
-    return categories;
   },
 
   /**
@@ -236,8 +238,6 @@ const Storage = {
       return newProduct;
     } catch (e) {
       console.warn('API failed, saving to localStorage:', e);
-      // Mark as offline for subsequent calls
-      // this._offlineMode = true; // Optional: Force offline mode? Maybe just fallback once.
       return this._addProductLocal(product, false); // false = not synced
     }
   },
@@ -315,7 +315,7 @@ const Storage = {
       return true;
     } catch (e) {
       console.warn('API failed, deleting from localStorage:', e);
-      return this._deleteProductLocal(id); // NOTE: Deletes locally, but server might still have it. Sync delete is harder.
+      return this._deleteProductLocal(id);
     }
   },
 
@@ -354,117 +354,8 @@ const Storage = {
     const lowerQuery = query.toLowerCase();
     return products.filter(p =>
       p.name.toLowerCase().includes(lowerQuery) ||
-      (p.sku && p.sku.toLowerCase().includes(lowerQuery)) ||
-      (p.category && p.category.toLowerCase().includes(lowerQuery))
+      (p.sku && p.sku.toLowerCase().includes(lowerQuery))
     );
-  },
-
-  // ===== Categories =====
-
-  /**
-   * Get all categories
-   */
-  async getCategories() {
-    if (this._categoriesCache) {
-      return this._categoriesCache;
-    }
-
-    // Offline mode
-    if (this._offlineMode) {
-      const data = localStorage.getItem('produk_manager_categories');
-      if (data) {
-        this._categoriesCache = JSON.parse(data);
-        return this._categoriesCache;
-      }
-      return this._getDefaultCategories();
-    }
-
-    try {
-      return await this._fetchCategories();
-    } catch (e) {
-      const data = localStorage.getItem('produk_manager_categories');
-      if (data) {
-        return JSON.parse(data);
-      }
-      return this._getDefaultCategories();
-    }
-  },
-
-  /**
-   * Get default categories
-   */
-  _getDefaultCategories() {
-    return [
-      'Elektronik',
-      'Fashion',
-      'Makanan & Minuman',
-      'Kesehatan',
-      'Rumah Tangga',
-      'Olahraga',
-      'Hobi',
-      'Lainnya'
-    ];
-  },
-
-  /**
-   * Add new category
-   */
-  async addCategory(name) {
-    this._categoriesCache = null;
-
-    if (this._offlineMode) {
-      return this._addCategoryLocal(name);
-    }
-
-    try {
-      await ApiClient.addCategory(name);
-      return true;
-    } catch (e) {
-      return this._addCategoryLocal(name);
-    }
-  },
-
-  /**
-   * Add category to localStorage (internal)
-   */
-  async _addCategoryLocal(name) {
-    const categories = await this.getCategories();
-    if (!categories.includes(name)) {
-      categories.push(name);
-      localStorage.setItem('produk_manager_categories', JSON.stringify(categories));
-      this._categoriesCache = categories;
-      return true;
-    }
-    return false;
-  },
-
-  /**
-   * Delete category
-   */
-  async deleteCategory(name) {
-    this._categoriesCache = null;
-
-    if (this._offlineMode) {
-      return this._deleteCategoryLocal(name);
-    }
-
-    try {
-      await ApiClient.deleteCategory(name);
-      return true;
-    } catch (e) {
-      return this._deleteCategoryLocal(name);
-    }
-  },
-
-  /**
-   * Delete category from localStorage (internal)
-   */
-  async _deleteCategoryLocal(name) {
-    const categories = await this.getCategories();
-    const filtered = categories.filter(c => c !== name);
-    localStorage.setItem('produk_manager_categories', JSON.stringify(filtered));
-    this._categoriesCache = filtered;
-    return true;
   },
 
   // ===== Image Upload =====

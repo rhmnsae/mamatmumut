@@ -43,37 +43,39 @@ const App = {
         console.log('🚀 Starting Latranshop...');
         const startTime = Date.now();
 
-        // Show loading
+        // Show loading briefly
         this.showLoading();
 
         try {
-            // Initialize auth and storage in parallel for speed
-            await Promise.all([
-                Auth.init(),
-                Storage.init()
-            ]);
+            // Initialize Auth first (fast, localStorage only)
+            await Auth.init();
 
-            // Check if user is logged in
+            // Check if user is logged in IMMEDIATELY
             if (!Auth.isLoggedIn()) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            console.log(`🛒 Latranshop initialized in ${Date.now() - startTime}ms`);
-
-            // Initialize UI modules (synchronous, fast)
+            // Initialize UI modules first (DOM setup only, no data needed)
             UI.init();
             Products.init();
             Export.init();
-
-            // Setup logout button
             this.setupLogout();
 
-            // Show dashboard page by default and init dashboard
-            UI.switchPage('dashboard');
-            Dashboard.init();
+            // CRITICAL: Wait for Storage.init() to complete
+            // This ensures data is fetched from API if localStorage is empty (new device)
+            await Storage.init();
 
-            // Pre-render products table in background (don't await)
+            // Hide loading after storage is ready
+            this.hideLoading();
+
+            // Show dashboard page - data is now available
+            UI.switchPage('dashboard');
+            await Dashboard.init();
+
+            console.log(`🛒 Latranshop initialized in ${Date.now() - startTime}ms`);
+
+            // Render products table (data is ready)
             Products.renderTable().catch(e => console.warn('Products render:', e));
 
         } catch (e) {
@@ -89,8 +91,6 @@ const App = {
             } catch (e2) {
                 console.error('Fallback init error:', e2);
             }
-        } finally {
-            // Hide loading immediately
             this.hideLoading();
         }
     },

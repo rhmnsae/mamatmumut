@@ -1,6 +1,7 @@
 /**
  * Export Module
- * Handles data export to CSV/Excel
+ * Handles data export to XLSX (Excel) format
+ * Uses SheetJS (xlsx) library for proper Excel file generation
  */
 
 const Export = {
@@ -17,102 +18,114 @@ const Export = {
     bindEvents() {
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportToCSV());
+            // Remove old listeners by cloning
+            const newBtn = exportBtn.cloneNode(true);
+            exportBtn.parentNode.replaceChild(newBtn, exportBtn);
+            newBtn.addEventListener('click', () => this.exportToXLSX());
         }
     },
 
     /**
-     * Export products to CSV
+     * Export products to XLSX (Excel)
      */
-    exportToCSV() {
-        const products = Storage.getProducts();
+    async exportToXLSX() {
+        try {
+            const products = await Storage.getProducts();
 
-        if (products.length === 0) {
-            UI.showToast('Tidak ada data untuk di-export', 'error');
-            return;
+            if (!products || products.length === 0) {
+                UI.showToast('Tidak ada data untuk di-export', 'error');
+                return;
+            }
+
+            UI.showToast('Memproses export...', 'info');
+
+            // Prepare data for Excel with clothing size fields
+            const excelData = products.map((p, index) => ({
+                'No': index + 1,
+                'Nama Produk': p.name || '',
+                'SKU': p.sku || '-',
+                'Harga Asli (Rp)': p.originalPrice || 0,
+                'Harga Jual (Rp)': p.salePrice || 0,
+                'Stok': p.stock || 0,
+                'Berat (gram)': p.weight || 0,
+                'Ukuran': p.size || '-',
+                'Panjang Bawahan (cm)': p.panjangBawahan || 0,
+                'Lingkar Pinggang (cm)': p.lingkarPinggang || 0,
+                'Lingkar Paha (cm)': p.lingkarPaha || 0,
+                'Tanggal Dibuat': this.formatDateExcel(p.createdAt),
+                'Tanggal Update': this.formatDateExcel(p.updatedAt)
+            }));
+
+            // Create workbook and worksheet
+            const ws = XLSX.utils.json_to_sheet(excelData);
+
+            // Set column widths for better readability
+            ws['!cols'] = [
+                { wch: 5 },   // No
+                { wch: 35 },  // Nama Produk
+                { wch: 15 },  // SKU
+                { wch: 15 },  // Harga Asli
+                { wch: 15 },  // Harga Jual
+                { wch: 8 },   // Stok
+                { wch: 12 },  // Berat
+                { wch: 10 },  // Ukuran
+                { wch: 18 },  // Panjang Bawahan
+                { wch: 18 },  // Lingkar Pinggang
+                { wch: 15 },  // Lingkar Paha
+                { wch: 18 },  // Tanggal Dibuat
+                { wch: 18 }   // Tanggal Update
+            ];
+
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Produk');
+
+            // Add summary sheet
+            const summaryData = [
+                { 'Keterangan': 'Total Produk', 'Nilai': products.length },
+                { 'Keterangan': 'Total Stok', 'Nilai': products.reduce((sum, p) => sum + (p.stock || 0), 0) },
+                { 'Keterangan': 'Stok Habis', 'Nilai': products.filter(p => (p.stock || 0) === 0).length },
+                { 'Keterangan': 'Stok Rendah (<10)', 'Nilai': products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 10).length },
+                { 'Keterangan': 'Total Nilai Inventori (Harga Jual)', 'Nilai': products.reduce((sum, p) => sum + ((p.salePrice || 0) * (p.stock || 0)), 0) },
+                { 'Keterangan': 'Tanggal Export', 'Nilai': new Date().toLocaleString('id-ID') }
+            ];
+            const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+            wsSummary['!cols'] = [{ wch: 35 }, { wch: 25 }];
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan');
+
+            // Generate filename with date
+            const filename = `Latranshop_Produk_${this.getDateString()}.xlsx`;
+
+            // Write and download
+            XLSX.writeFile(wb, filename);
+
+            UI.showToast(`${products.length} produk berhasil di-export ke Excel`, 'success');
+
+        } catch (error) {
+            console.error('Export error:', error);
+            UI.showToast('Gagal export: ' + error.message, 'error');
         }
-
-        // CSV Headers
-        const headers = [
-            'Nama Produk',
-            'SKU',
-            'Kategori',
-            'Harga Asli',
-            'Harga Jual',
-            'Stok',
-            'Berat (gram)',
-            'Panjang (cm)',
-            'Lebar (cm)',
-            'Tinggi (cm)',
-            'Tanggal Dibuat',
-            'Tanggal Update'
-        ];
-
-        // CSV Rows
-        const rows = products.map(p => [
-            this.escapeCSV(p.name),
-            this.escapeCSV(p.sku || ''),
-            this.escapeCSV(p.category || ''),
-            p.originalPrice || 0,
-            p.salePrice,
-            p.stock,
-            p.weight || 0,
-            p.dimensions?.l || 0,
-            p.dimensions?.w || 0,
-            p.dimensions?.h || 0,
-            this.formatDate(p.createdAt),
-            this.formatDate(p.updatedAt)
-        ]);
-
-        // Build CSV content
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
-
-        // Add BOM for Excel compatibility
-        const BOM = '\uFEFF';
-        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-
-        // Create download link
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', `latranshop_produk_${this.getDateString()}.csv`);
-        link.style.visibility = 'hidden';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(url);
-
-        UI.showToast(`${products.length} produk berhasil di-export`);
     },
 
     /**
-     * Escape CSV special characters
+     * Format date for Excel display
      */
-    escapeCSV(str) {
-        if (typeof str !== 'string') return str;
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-            return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-    },
+    formatDateExcel(isoString) {
+        if (!isoString) return '-';
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return '-';
 
-    /**
-     * Format date for display
-     */
-    formatDate(isoString) {
-        if (!isoString) return '';
-        const date = new Date(isoString);
-        return date.toLocaleDateString('id-ID', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
+        } catch (e) {
+            return '-';
+        }
     },
 
     /**

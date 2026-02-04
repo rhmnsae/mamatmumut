@@ -69,9 +69,47 @@ const Products = {
 
       if (products.length === 0) {
         tbody.innerHTML = '';
-        if (mobileCards) mobileCards.innerHTML = '';
-        if (productsCard) productsCard.classList.add('hidden');
-        emptyState.classList.remove('hidden');
+        if (mobileCards) {
+          // Show search not found message in mobile
+          if (searchQuery) {
+            mobileCards.innerHTML = `
+              <div class="search-empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5;">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <p style="font-weight: 500; margin-bottom: 4px;">Produk tidak ditemukan</p>
+                <p style="font-size: 13px; opacity: 0.7;">Tidak ada produk dengan kata kunci "${searchQuery}"</p>
+              </div>
+            `;
+          } else {
+            mobileCards.innerHTML = '';
+          }
+        }
+        if (productsCard) {
+          if (searchQuery) {
+            // Show search not found on productsCard
+            productsCard.classList.remove('hidden');
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="10" class="text-center" style="padding: 40px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5;">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                  <p style="font-weight: 500; margin-bottom: 4px;">Produk tidak ditemukan</p>
+                  <p style="font-size: 13px; opacity: 0.7;">Tidak ada produk dengan kata kunci "${searchQuery}"</p>
+                </td>
+              </tr>
+            `;
+            emptyState.classList.add('hidden');
+          } else {
+            productsCard.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+          }
+        } else {
+          emptyState.classList.remove('hidden');
+        }
         return;
       }
 
@@ -108,12 +146,8 @@ const Products = {
                   <td class="text-right">
                       <span class="text-sm text-secondary">${product.weight ? `${product.weight}g` : '-'}</span>
                   </td>
-                  <td>
-                      <span class="text-sm text-secondary text-xs">
-                          ${product.dimensions && (product.dimensions.l || product.dimensions.w || product.dimensions.h)
-          ? `${product.dimensions.l || 0}x${product.dimensions.w || 0}x${product.dimensions.h || 0}`
-          : '-'}
-                      </span>
+                  <td class="text-center">
+                      <span class="text-sm text-secondary font-medium">${product.size || '-'}</span>
                   </td>
                   <td class="text-center">
                       <span 
@@ -175,11 +209,6 @@ const Products = {
       return '';
     };
 
-    const formatDimensions = (dimensions) => {
-      if (!dimensions || (!dimensions.l && !dimensions.w && !dimensions.h)) return '-';
-      return `${dimensions.l || 0}×${dimensions.w || 0}×${dimensions.h || 0} cm`;
-    };
-
     container.innerHTML = products.map(product => `
             <div class="mobile-product-card" data-id="${product.id}">
                 <div class="mobile-product-header">
@@ -214,9 +243,23 @@ const Products = {
                             <span class="mobile-product-label">Berat</span>
                             <span class="mobile-product-value">${product.weight ? `${product.weight}g` : '-'}</span>
                         </div>
-                        <div class="mobile-product-detail full-width">
-                            <span class="mobile-product-label">Dimensi (P×L×T)</span>
-                            <span class="mobile-product-value">${formatDimensions(product.dimensions)}</span>
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">Ukuran</span>
+                            <span class="mobile-product-value" style="font-weight: 600;">${product.size || '-'}</span>
+                        </div>
+                    </div>
+                    <div class="mobile-product-detail-row">
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">P. Bawahan</span>
+                            <span class="mobile-product-value">${product.panjangBawahan ? `${product.panjangBawahan} cm` : '-'}</span>
+                        </div>
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">L. Pinggang</span>
+                            <span class="mobile-product-value">${product.lingkarPinggang ? `${product.lingkarPinggang} cm` : '-'}</span>
+                        </div>
+                        <div class="mobile-product-detail">
+                            <span class="mobile-product-label">L. Paha</span>
+                            <span class="mobile-product-value">${product.lingkarPaha ? `${product.lingkarPaha} cm` : '-'}</span>
                         </div>
                     </div>
                 </div>
@@ -312,11 +355,10 @@ const Products = {
       salePrice: parseFloat(document.getElementById('productSalePrice').value),
       stock: parseInt(document.getElementById('productStock').value),
       weight: parseFloat(document.getElementById('productWeight').value) || 0,
-      dimensions: {
-        l: parseFloat(document.getElementById('productLength').value) || 0,
-        w: parseFloat(document.getElementById('productWidth').value) || 0,
-        h: parseFloat(document.getElementById('productHeight').value) || 0
-      },
+      size: document.getElementById('productSize').value || null,
+      panjangBawahan: parseFloat(document.getElementById('productPanjangBawahan').value) || 0,
+      lingkarPinggang: parseFloat(document.getElementById('productLingkarPinggang').value) || 0,
+      lingkarPaha: parseFloat(document.getElementById('productLingkarPaha').value) || 0,
       image: UI.currentImage || null
     };
 

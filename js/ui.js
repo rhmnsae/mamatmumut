@@ -527,9 +527,10 @@ const UI = {
             document.getElementById('productSalePrice').value = product.salePrice;
             document.getElementById('productStock').value = product.stock;
             document.getElementById('productWeight').value = product.weight || '';
-            document.getElementById('productLength').value = product.dimensions?.l || '';
-            document.getElementById('productWidth').value = product.dimensions?.w || '';
-            document.getElementById('productHeight').value = product.dimensions?.h || '';
+            document.getElementById('productSize').value = product.size || '';
+            document.getElementById('productPanjangBawahan').value = product.panjangBawahan || '';
+            document.getElementById('productLingkarPinggang').value = product.lingkarPinggang || '';
+            document.getElementById('productLingkarPaha').value = product.lingkarPaha || '';
 
             if (product.image) {
                 this.showImagePreview(product.image);

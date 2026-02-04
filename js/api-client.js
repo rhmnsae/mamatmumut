@@ -19,6 +19,9 @@ const ApiClient = {
     // API availability flag
     _isApiAvailable: null,
 
+    // Cache products from availability check to avoid double-fetch
+    _cachedProducts: null,
+
     /**
      * Get stored auth token
      */
@@ -38,32 +41,49 @@ const ApiClient = {
     },
 
     /**
-     * Check if API is available (quick ping test)
+     * Check if API is available and fetch products in one call
+     * Mengambil data sekaligus saat check API untuk menghindari double-fetch
      */
     async isAvailable() {
-        // Return cached result if already checked
-        if (this._isApiAvailable !== null) {
-            return this._isApiAvailable;
-        }
-
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5s timeout for ping
+            // 2 detik timeout
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-            const response = await fetch(`${this.BASE_URL}/categories.php`, {
+            // Fetch products - this both checks availability AND gets data
+            const response = await fetch(`${this.BASE_URL}/products`, {
                 method: 'GET',
                 signal: controller.signal
             });
 
             clearTimeout(timeoutId);
-            this._isApiAvailable = response.ok;
-            console.log(this._isApiAvailable ? '🌐 API online' : '⚠️ API unavailable');
-            return this._isApiAvailable;
-        } catch (e) {
-            console.warn('⚠️ API offline - using localStorage');
+
+            if (response.ok) {
+                // Cache the products data to avoid fetching again
+                const data = await response.json();
+                this._cachedProducts = data;
+                this._isApiAvailable = true;
+                console.log('🌐 API online - data dimuat');
+                return true;
+            }
+
             this._isApiAvailable = false;
             return false;
+        } catch (e) {
+            console.warn('⚠️ API offline - menggunakan data lokal');
+            this._isApiAvailable = false;
+            this._cachedProducts = null;
+            return false;
         }
+    },
+
+    /**
+     * Get cached products from availability check
+     */
+    getCachedProducts() {
+        const cached = this._cachedProducts;
+        this._cachedProducts = null; // Clear after use
+        return cached;
     },
 
     /**
@@ -267,67 +287,42 @@ const ApiClient = {
      * Get all products
      */
     async getProducts() {
-        return this.get('products.php');
+        return this.get('products');
     },
 
     /**
      * Get product by ID
      */
     async getProduct(id) {
-        return this.get(`products.php?id=${id}`);
+        return this.get(`products?id=${id}`);
     },
 
     /**
      * Search products
      */
     async searchProducts(query) {
-        return this.get(`products.php?search=${encodeURIComponent(query)}`);
+        return this.get(`products?search=${encodeURIComponent(query)}`);
     },
 
     /**
      * Create product
      */
     async createProduct(productData) {
-        return this.post('products.php', productData);
+        return this.post('products', productData);
     },
 
     /**
      * Update product
      */
     async updateProduct(id, productData) {
-        return this.put(`products.php?id=${id}`, productData);
+        return this.put(`products?id=${id}`, productData);
     },
 
     /**
      * Delete product
      */
     async deleteProduct(id) {
-        return this.delete(`products.php?id=${id}`);
-    },
-
-    // ========================================
-    // CATEGORIES API
-    // ========================================
-
-    /**
-     * Get all categories
-     */
-    async getCategories() {
-        return this.get('categories.php');
-    },
-
-    /**
-     * Add category
-     */
-    async addCategory(name) {
-        return this.post('categories.php', { name });
-    },
-
-    /**
-     * Delete category
-     */
-    async deleteCategory(name) {
-        return this.delete(`categories.php?name=${encodeURIComponent(name)}`);
+        return this.delete(`products?id=${id}`);
     }
 };
 
