@@ -10,11 +10,12 @@
   --bg-glass: rgba(255, 255, 255, 0.05);
   --bg-glass-hover: rgba(255, 255, 255, 0.08);
 
-  /* Accent Colors */
-  --accent-primary: #7c3aed;
-  --accent-secondary: #2563eb;
-  --accent-gradient: linear-gradient(135deg, #7c3aed, #2563eb);
-  --accent-glow: rgba(124, 58, 237, 0.3);
+  /* Accent Colors - White theme in dark mode */
+  --accent-primary: #ffffff;
+  --accent-secondary: #e2e8f0;
+  --accent-gradient: linear-gradient(135deg, #ffffff, #e2e8f0);
+  --accent-glow: rgba(255, 255, 255, 0.2);
+  --accent-text: #0f172a;
 
   /* Text Colors */
   --text-primary: #ffffff;
@@ -114,11 +115,18 @@
   --danger-bg: rgba(239, 68, 68, 0.12);
   --info-bg: rgba(59, 130, 246, 0.12);
 
+  /* Accent Colors - Black theme in light mode */
+  --accent-primary: #1e293b;
+  --accent-secondary: #334155;
+  --accent-gradient: linear-gradient(135deg, #1e293b, #334155);
+  --accent-glow: rgba(0, 0, 0, 0.15);
+  --accent-text: #ffffff;
+
   /* Shadows - lighter for light mode */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.15);
+  --shadow-glow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
 /* ========================================
