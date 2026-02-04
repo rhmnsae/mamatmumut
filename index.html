@@ -51,11 +51,12 @@
     <!-- Theme Script (loads early to prevent flash) -->
     <script>
         (function () {
-            // Apply saved theme immediately
+            // Apply saved theme immediately (before DOM loads)
             const savedTheme = localStorage.getItem('latranshop_theme');
-            if (savedTheme) {
-                document.documentElement.setAttribute('data-theme', savedTheme);
+            if (savedTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
             }
+            // If empty or 'dark', don't set attribute (dark is default)
 
             // Setup toggle button when DOM ready
             document.addEventListener('DOMContentLoaded', function () {
@@ -63,19 +64,19 @@
                 if (toggle) {
                     toggle.addEventListener('click', function () {
                         const html = document.documentElement;
-                        const currentTheme = html.getAttribute('data-theme');
-                        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                        const isLightMode = html.getAttribute('data-theme') === 'light';
 
-                        // Apply theme
-                        if (newTheme === 'dark') {
+                        if (isLightMode) {
+                            // Switch to dark mode
                             html.removeAttribute('data-theme');
-                            localStorage.setItem('latranshop_theme', '');
+                            localStorage.setItem('latranshop_theme', 'dark');
+                            console.log('🎨 Theme: dark');
                         } else {
-                            html.setAttribute('data-theme', newTheme);
-                            localStorage.setItem('latranshop_theme', newTheme);
+                            // Switch to light mode
+                            html.setAttribute('data-theme', 'light');
+                            localStorage.setItem('latranshop_theme', 'light');
+                            console.log('🎨 Theme: light');
                         }
-
-                        console.log('🎨 Theme:', newTheme);
                     });
                 }
             });
